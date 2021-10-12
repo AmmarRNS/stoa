@@ -4155,10 +4155,10 @@ export class LedgerStorage extends Storages {
                     M.voting_start_date,
                     M.voting_end_date,
                     count(*) OVER() AS full_count
-                    FROM proposal P
-                    LEFT OUTER JOIN proposal_metadata M
-                    ON(P.proposal_id = M.proposal_id)
-                    LIMIT ? OFFSET ?
+                FROM proposal P
+                     LEFT OUTER JOIN proposal_metadata M
+                     ON(P.proposal_id = M.proposal_id)
+                     LIMIT ? OFFSET ?
             `;
         return this.query(sql, [limit, limit * (page - 1)]);
     }
@@ -4191,16 +4191,30 @@ export class LedgerStorage extends Storages {
                     M.ave_pre_evaluation_score,
                     P.proposer_address,
                     P.proposal_fee_address
-                FROM proposal P 
-                LEFT OUTER JOIN proposal_metadata M
-                ON (P.proposal_id = M.proposal_id)
+                FROM proposal P
+                     LEFT OUTER JOIN proposal_metadata M ON (P.proposal_id = M.proposal_id)
                 WHERE P.proposal_id = ?
             `;
         const urls = `
                 SELECT url
                 FROM proposal_attachments
-                WHERE proposal_id=?`
+                WHERE proposal_id=?`;
+
+        const votes = `
+                    SELECT ballot_answer,
+                            count(*) as count
+                    FROM   ballots
+                    WHERE  proposal_id=?
+                    GROUP BY ballot_answer
+                    ORDER BY ballot_answer ASC
+                    `;
+
+        const validators = `
+                    SELECT count(DISTINCT(address)) as total_validators
+                    FROM   validators
+        `;
         const result: any = {};
+        let totalValidators: any;
         // return this.query(sql, [proposal_id]);
         return new Promise<any>((resolve, reject) => {
             this.query(sql, [proposal_id.toString()])
@@ -4210,6 +4224,38 @@ export class LedgerStorage extends Storages {
                 })
                 .then((rows: any[]) => {
                     result.url = rows;
+                    return this.query(validators, []);
+                })
+                .then((data: any) => {
+                    totalValidators = data[0].total_validators;
+                    result.total_validators = totalValidators;
+                    return this.query(votes, [proposal_id.toString()]);
+                })
+                .then((rows: any[]) => {
+                    let yesCount = 0;
+                    let noCount = 0;
+                    let abstainCount = 0;
+                    let rejectCount = 0;
+
+                    for (const row of rows) {
+                        row.ballot_answer === 0 ? (yesCount = row.count) : 0;
+                        row.ballot_answer === 1 ? (noCount = row.count) : 0;
+                        row.ballot_answer === 2 ? (abstainCount = row.count) : 0;
+                        row.ballot_answer === 9 ? (rejectCount = row.count) : 0;
+                    }
+                    const notVotedCount = totalValidators - yesCount - noCount - abstainCount - rejectCount;
+
+                    result.yes = yesCount;
+                    result.no = noCount;
+                    result.abstain = abstainCount;
+                    result.reject = rejectCount;
+                    result.not_voted = notVotedCount;
+
+                    result.yes_percent = (yesCount / totalValidators) * 100;
+                    result.no_percent = (noCount / totalValidators) * 100;
+                    result.abstain_percent = abstainCount / totalValidators * 100;
+                    result.reject_percent = rejectCount / totalValidators * 100;
+                    result.not_voted_percent = notVotedCount / totalValidators * 100;
                     resolve(result);
                 })
                 .catch(reject);
