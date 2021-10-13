@@ -1009,6 +1009,11 @@ export interface IProposalList {
     proposal_id: string;
 
     /**
+     * Voted Not Voted Percentage
+     */
+    proposal_result: string;
+
+    /**
      * Title of the proposal
      */
     proposal_title: string;
@@ -1062,6 +1067,38 @@ export interface IProposalList {
      * Full count
      */
     full_count: number;
+
+
+    /**
+     * Total Validators Count
+     */
+    total_validators: number;
+
+    /**
+     * Voted yes Percentage
+     */
+    yes_percentage: number;
+
+    /**
+     * Voted No Percentage
+     */
+    no_percentage: number;
+
+    /**
+     * Voted Abstain Percentage
+     */
+    abstain_percentage: number;
+
+    /**
+     * Voted Not Voted Percentage
+     */
+    voted_percentage: number;
+
+    /**
+     * Voted Not Voted Percentage
+     */
+    not_voted_percentage: number;
+
 }
 
 /**
